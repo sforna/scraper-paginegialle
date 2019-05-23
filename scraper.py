@@ -1,83 +1,48 @@
-#Esempio recupero elenco aziende
+import requests
+import csv
 
-import scraperwiki
-import lxml.html
-from urllib import urlencode
-import json
-import re
-
-# Tutorial Data Extraction
-
-def get_text(el, class_name):
-    els = el.find_class(class_name)
-    if els:
-        return els[0].text_content()
-    else:
-        return ''
-
-def get_href(el, class_name):
-    els = el.find_class(class_name)
-    if els:
-        return els[0].get('href')
-    else:
-        return ''
-
-def get_value(el):
-    return get_text(el, 'value') or el.text_content()
-
-def get_all_texts(el, class_name):
-    return [e.text_content() for e in els.find_class(class_name)]
-
-def parse_addresses(el):
-    return el.find_class('adr')
-
-
-html = scraperwiki.scrape("http://roma.paginegialle.it/lazio/roma/pizzeria.html")
-root = lxml.html.fromstring(html)
-
-li = {}
-
-companies = []
+#url = 'https://www.paginegialle.it/ricerca/ottica/Sezze%20(LT)/p-' + str(i)
 name = []
+phone = []
 address = []
-locality = []
-website = []
-tel = []
-category = []
+zipcode = []
+city = []
+province = []
+pages = []
+from bs4 import BeautifulSoup
 
-for el in root.cssselect("div.org"):
-    name.append (get_text (el,"rgs"))
+for i in range(1,4):
+    url = 'https://www.paginegialle.it/ricerca/ottica/Sezze%20(LT)/p-' + str(i)
+    pages.append(url)
 
-for el in root.cssselect("div.address"):
-    address.append (get_text (el,"street-address"))
+for item in pages:
+    page = requests.get(item)
+    soup = BeautifulSoup(page.text, 'html.parser')
+    sectionTag = soup.find_all('section', class_='vcard')
 
-for el in root.cssselect("div.address"):
-    locality.append (get_text (el,"locality"))
+    #name
+    for x in soup.find_all('header', class_=None):
+        name.append(x.find('a', class_=None).text.lstrip().rstrip())
+    #phone
+    for tag in sectionTag:
+        spanTags = tag.find_all('span', class_='phone-label')
+        for tag in spanTags:
+            phone.append(tag.text.replace(',', ''))
+    #address
+    for x in soup.find_all('div', class_='street-address'):
+        address.append(x.find(class_=None).text)
+    #ZIP
+    for x in soup.find_all('span', class_='postal-code'):
+        zipcode.append(x.text)
+    #city
+    for x in soup.find_all('span', class_='locality'):
+        city.append(x.text)
+    #province
+    for x in soup.find_all('span', class_='region'):
+        province.append(x.text.replace('(', '').replace(')', ''))
 
-for el in root.cssselect("div.tel"):
-    tel.append (get_text (el,"tel") )
-
-for el in root.cssselect("div.link"):
-    website.append (get_href (el,"_noc") )  
-
-for el in root.cssselect("div.text"):
-    category.append (get_text (el,"snippet") )  
-
-i = 0
-for el in root.cssselect("div.org"):
-    print 'Name ', name[i]
-    print 'Address ', address[i]
-    print 'Locality ', locality[i]
-    print 'Tel', tel[i]
-    print 'Website', website[i]
-    print 'Category', category[i]
-    li['CompanyName'] = name[i].upper().replace("\n","")
-    li['Address'] = address[i].upper().replace("\n","")
-    li['Locality'] = locality[i].upper().replace("\n","")
-    li['Tel'] = tel[i].upper().replace("\n","")
-    li['WebSite'] = website[i].lower().replace("\n","")
-    li['Category'] = category[i].upper().replace("\n","")
-    scraperwiki.sqlite.save(unique_keys=['CompanyName'], data=li)
-    i = i + 1
-
-#Fine Recupero elenco aziende
+rows = zip(name,phone,address,city,zipcode,province)
+with open('prova.csv', "w") as f:
+    writer = csv.writer(f)
+    for row in rows:
+        writer.writerow(row)
